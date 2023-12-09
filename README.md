@@ -1,6 +1,6 @@
 # login_app
 
-An android app created using flutter that supprts login using email, google, and facebook
+An android app created using flutter that supports login using email, google, and facebook
 
 ## Setup
 Install Flutter (follow all the steps given in the guide):
