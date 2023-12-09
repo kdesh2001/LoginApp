@@ -5,6 +5,7 @@ A new Flutter project.
 ## Setup
 Install Flutter (follow all the steps given in the guide):
 - [Flutter setup guide](https://docs.flutter.dev/get-started/install)
+
 Install dependencies:
 ```
 flutter pub get
