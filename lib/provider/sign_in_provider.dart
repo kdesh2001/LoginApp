@@ -1,12 +1,15 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
 
 class SignInProvider extends ChangeNotifier{
-  // final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  //Creating Authentication instances for Email, Facebook and Google
   final FirebaseAuth firebaseAuth = FirebaseAuth.instance;
   final FacebookAuth facebookAuth = FacebookAuth.instance;
   final GoogleSignIn googleSignIn = GoogleSignIn(
@@ -35,12 +38,11 @@ class SignInProvider extends ChangeNotifier{
   String? _imageUrl;
   String? get imageUrl => _imageUrl;
 
-  // UserMetadata? _metadata;
-  // UserMetadata? get metadata => _metadata;
 
   SignInProvider(){
     checkSignInUser();
   }
+  //Sign in state
   Future checkSignInUser() async {
     final SharedPreferences s = await SharedPreferences.getInstance();
     _isSignedIn = s.getBool("signed_in")?? false;
@@ -52,6 +54,8 @@ class SignInProvider extends ChangeNotifier{
     _isSignedIn = true;
     notifyListeners();
   }
+
+  //Sign in with Google, gets token from google and signs in to firebase auth
   Future signInWithGoogle() async {
     final GoogleSignInAccount? googleSignInAccount =
         await googleSignIn.signIn();
@@ -75,9 +79,56 @@ class SignInProvider extends ChangeNotifier{
         _imageUrl = userDetails.photoURL;
         _provider = "GOOGLE";
         _uid = userDetails.uid;
-        // _metadata = userDetails.metadata;
         notifyListeners();
       } on FirebaseAuthException catch (e) {
+        switch (e.code) {
+          //In case the email is already in use for different provider
+          case "account-exists-with-different-credential":
+            _errorCode =
+                "You already have an account with us. Use correct provider";
+            _hasError = true;
+            notifyListeners();
+            break;
+
+          case "null":
+            _errorCode = "Some unexpected error while trying to sign in";
+            _hasError = true;
+            notifyListeners();
+            break;
+          default:
+            _errorCode = e.toString();
+            _hasError = true;
+            notifyListeners();
+        }
+      }
+    }
+    else{
+      _hasError=true;
+      notifyListeners();
+    }
+  }
+
+  //Sign in using facebook
+  Future signInWithFacebook() async {
+    final LoginResult result = await facebookAuth.login();
+    //Get user profile
+    final graphResponse = await http.get(
+    Uri.parse('https://graph.facebook.com/v2.12/me?fields=name,picture.width(800).height(800),first_name,last_name,email&access_token=${result.accessToken!.token}'));
+    final profile = jsonDecode(graphResponse.body);
+    if(result.status==LoginStatus.success){
+      try{
+        //Sign in to firestore using credentials/tokens
+        final OAuthCredential credential = FacebookAuthProvider.credential(result.accessToken!.token);
+        //Get user data
+        await firebaseAuth.signInWithCredential(credential);
+        _name=profile['name'];
+        _email=profile['email'];
+        _imageUrl=profile['picture']['data']['url'];
+        _uid=profile['id'];
+        _provider="FACEBOOK";
+        _hasError=false;
+        notifyListeners();
+      }on FirebaseAuthException catch (e) {
         switch (e.code) {
           case "account-exists-with-different-credential":
             _errorCode =
@@ -104,18 +155,21 @@ class SignInProvider extends ChangeNotifier{
     }
   }
 
+  //Sign in using email
   Future signInWithEmail(String email, String password) async {
     try{
       UserCredential credential =await firebaseAuth.signInWithEmailAndPassword(email: email, password: password);
+      //Retreive user data
       _name = (credential.user!).displayName;
       _email = (credential.user!).email;
       _imageUrl = (credential.user!).photoURL;
       _provider = "Email";
-      // _uid = (credential.user).uid;
+      _uid=(credential.user!).uid;
+      
       notifyListeners();
     }on FirebaseAuthException catch (e) {
       if (e.code == 'user-not-found' || e.code == 'wrong-password') {
-        // showToast(message: 'Invalid email or password.');
+        
         _errorCode = 'Invalid email or password';
         _hasError = true;
         notifyListeners();
@@ -123,26 +177,25 @@ class SignInProvider extends ChangeNotifier{
         _errorCode = e.toString();
         _hasError = true;
         notifyListeners();
-        // showToast(message: 'An error occurred: ${e.code}');
+        
       }
 
     }
 
     
   }
-  // postDetails() async{
-  //   final FirebaseFirestore firestore = FirebaseFirestore.instance;
-  //   User? user = firebaseAuth.currentUser;
-  // }
-
+  
+  //Sign up using email
   Future signUpWithEmail(String email, String password, String username) async {
     try {
+      //Create new user
       UserCredential uc = await firebaseAuth.createUserWithEmailAndPassword(email: email, password: password);
+      //Add data
       _name=username;
       _email=email;
       _provider="EMAIL";
       _uid=(uc.user!).uid;
-      _imageUrl="";
+      _imageUrl="https://static.vecteezy.com/system/resources/thumbnails/020/765/399/small/default-profile-account-unknown-icon-black-silhouette-free-vector.jpg";
       
       notifyListeners();
       
@@ -152,12 +205,12 @@ class SignInProvider extends ChangeNotifier{
         _errorCode = "Email is already registered";
         _hasError = true;
         notifyListeners();
-        // showToast(message: 'The email address is already in use.');
+        
       } else {
         _errorCode = e.toString();
         _hasError = true;
         notifyListeners();
-        // showToast(message: 'An error occurred: ${e.code}');
+        
       }
     }
     return null;
@@ -165,17 +218,24 @@ class SignInProvider extends ChangeNotifier{
     
   }
 
+  //Sign out
   Future userSignOut() async{
+    //Sign out all the authentication instances
     await firebaseAuth.signOut();
     await googleSignIn.signOut();
+    await facebookAuth.logOut();
     _isSignedIn=false;
     notifyListeners();
+    //Clear data
+    clearStoredData();
 
   }
   Future clearStoredData() async {
     final SharedPreferences s = await SharedPreferences.getInstance();
     s.clear();
   }
+
+  //retreive data from firestore database
   Future getUserDataFromFirestore(uid) async {
     await FirebaseFirestore.instance
         .collection("users")
@@ -190,6 +250,7 @@ class SignInProvider extends ChangeNotifier{
             });
   }
 
+  //Saving data to firestore
   Future saveDataToFirestore() async {
     final DocumentReference r =
         FirebaseFirestore.instance.collection("users").doc(uid);
@@ -203,6 +264,7 @@ class SignInProvider extends ChangeNotifier{
     notifyListeners();
   }
 
+  //Save data locally
   Future saveDataToSharedPreferences() async {
     final SharedPreferences s = await SharedPreferences.getInstance();
     await s.setString('name', _name!);
@@ -213,6 +275,7 @@ class SignInProvider extends ChangeNotifier{
     notifyListeners();
   }
 
+  //Get data locally
   Future getDataFromSharedPreferences() async {
     final SharedPreferences s = await SharedPreferences.getInstance();
     _name = s.getString('name');
@@ -225,11 +288,11 @@ class SignInProvider extends ChangeNotifier{
   Future<bool> checkUserExists() async{
     DocumentSnapshot snap = await FirebaseFirestore.instance.collection('users').doc(_uid).get();
     if(snap.exists){
-      // print("Existing user");
+      
       return true;
     }
     else{
-      // print("New user");
+      
       return false;
     }
   }

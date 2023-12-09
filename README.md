@@ -2,15 +2,19 @@
 
 A new Flutter project.
 
-## Getting Started
+## Setup
+Install Flutter (follow all the steps given in the guide):
+- [Flutter setup guide](https://docs.flutter.dev/get-started/install)
+Install dependencies:
+```
+flutter pub get
+```
+Run the application:
+```
+flutter run
+```
 
-This project is a starting point for a Flutter application.
+Note:
+- Use different email ids with google and facebook (and email registration too)
+- Ensure you are logging in using Meta developers account (New Facebook policy)
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.

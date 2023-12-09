@@ -25,6 +25,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final sp = context.read<SignInProvider>();
+    //Display user info
     return Scaffold(
       body: Center(
         child:
@@ -41,20 +42,24 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               Text("Welcome ${sp.name}!", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w500),),
               const SizedBox(
-                height: 10,
+                height: 20,
               ),
               Text("${sp.email}", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),),
               const SizedBox(
-                height: 10,
+                height: 20,
               ),
               Text("You have logged in using ${sp.provider}.", style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),),
               const SizedBox(
                 height: 30,
               ),
               ElevatedButton(onPressed: (){
-                sp.userSignOut();
+                sp.userSignOut(); //Handle sign out
                 nextScreenReplace(context, const LoginScreen());
-              }, child: const Text("Sign out", style: TextStyle(color: Colors.white),))
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey.shade800,
+              ),
+               child: const Text("Sign out", style: TextStyle(color: Colors.white),))
             ],
           ),
           

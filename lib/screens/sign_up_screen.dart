@@ -156,9 +156,11 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
   void handleSignUp() async {
+    //Get user data using text controllers
     String username = _usernameController.text;
     String email = _emailController.text;
     String password = _passwordController.text;
+    //Create account using sign in provider
     final sp = context.read<SignInProvider>();
     await sp.signUpWithEmail(email, password, username).then((value) {
       if(sp.hasError==true){
@@ -166,6 +168,7 @@ class _SignupScreenState extends State<SignupScreen> {
           signupController.reset();
         }
         else{
+          //Save data to the firestore, and locally, show success, go to home page
           sp.saveDataToFirestore().then((value) => sp
                   .saveDataToSharedPreferences()
                   .then((value) => sp.setSignIn().then((value){

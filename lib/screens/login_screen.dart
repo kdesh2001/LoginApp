@@ -31,6 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
+      resizeToAvoidBottomInset: false,
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
@@ -137,7 +138,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     height: 10,
                   ),
                   RoundedLoadingButton(
-                  onPressed: (){},
+                  onPressed: (){
+                    handleFacebookSignIn();
+                  },
                   controller: facebookController,
                   successColor: Colors.blue,
                   width: MediaQuery.of(context).size.width * 0.80,
@@ -198,31 +201,30 @@ class _LoginScreenState extends State<LoginScreen> {
       
     );
   }
+
+  //Function to sign in using email
   Future handleEmailSignIn() async{
     final sp = context.read<SignInProvider>();
     final ip = context.read<InternetProvider>();
     await ip.checkInternetConnection();
+    //Check internet
     if(ip.hasInternet == false){
       openSnackbar(context, "Check your internet connection", Colors.red);
       emailButtonController.reset();
       
     }
     else{
-      // await sp.signInWithEmail(_emailController.text, _passwordController.text).then((uid) => {
-      //   emailButtonController.success(),
-      //   handleAfterSignIn()
-      // });
-
-
-      //---
+      //Try signing in using firebase
       await sp.signInWithEmail(_emailController.text, _passwordController.text).then((value) {
         if(sp.hasError==true){
           openSnackbar(context, sp.errorCode.toString(), Colors.red);
           emailButtonController.reset();
         }
         else{
+          //Check if user exists
           sp.checkUserExists().then((value) async{
             if(value==true){
+              //Save data locally, show success, go to home page
               await sp.getUserDataFromFirestore(sp.uid).then((value) => sp.saveDataToSharedPreferences().then((value) => sp.setSignIn().then((value){
                 emailButtonController.success();
                 handleAfterSignIn();
@@ -238,6 +240,48 @@ class _LoginScreenState extends State<LoginScreen> {
 
     }
   }
+  //Function to sign in using Facebook
+  Future handleFacebookSignIn() async{
+    final sp = context.read<SignInProvider>();
+    final ip = context.read<InternetProvider>();
+    await ip.checkInternetConnection();
+    if(ip.hasInternet == false){
+      //Check internet
+      openSnackbar(context, "Check your internet connection", Colors.red);
+      facebookController.reset();
+      
+    }
+    else{
+      await sp.signInWithFacebook().then((value) {
+        if(sp.hasError==true){
+          openSnackbar(context, sp.errorCode.toString(), Colors.red);
+          facebookController.reset();
+        }
+        else{
+          sp.checkUserExists().then((value) async{
+            if(value==true){
+              await sp.getUserDataFromFirestore(sp.uid).then((value) => sp.saveDataToSharedPreferences().then((value) => sp.setSignIn().then((value){
+                facebookController.success();
+                handleAfterSignIn();
+              })));
+            }
+            else{
+              //If signing in using facebook for first time
+              //Save data in firestore, locally, show success, go to home page
+              sp.saveDataToFirestore().then((value) => sp
+                  .saveDataToSharedPreferences()
+                  .then((value) => sp.setSignIn().then((value){
+                    facebookController.success();
+                    handleAfterSignIn();
+                  })));
+            }
+          });
+        }
+      } );
+    }
+  }
+
+  //Function to sign in using Google
   Future handleGoogleSignIn() async{
     final sp = context.read<SignInProvider>();
     final ip = context.read<InternetProvider>();
@@ -262,6 +306,8 @@ class _LoginScreenState extends State<LoginScreen> {
               })));
             }
             else{
+              //If signing in using google for first time
+              //Save data in firestore, locally, show success, go to home page
               sp.saveDataToFirestore().then((value) => sp
                   .saveDataToSharedPreferences()
                   .then((value) => sp.setSignIn().then((value){
@@ -274,6 +320,8 @@ class _LoginScreenState extends State<LoginScreen> {
       } );
     }
   }
+
+  //Navigate to Home Screen after login
   handleAfterSignIn(){
     Future.delayed(const Duration(milliseconds: 1000)).then((value){
       nextScreenReplace(context, const HomeScreen());
